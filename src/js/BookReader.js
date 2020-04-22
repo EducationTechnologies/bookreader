@@ -248,6 +248,8 @@ BookReader.prototype.extendParams = function(params, newParams) {
  */
 BookReader.prototype.initParams = function() {
   var params = {};
+  // True if changing the URL
+  params.fragmentChange = false;
 
   // This is ordered from lowest to highest priority
 
@@ -269,6 +271,10 @@ BookReader.prototype.initParams = function() {
     // Check cookies
     var val = this.getResumeValue();
     if (val !== null) {
+      // If page index different from default
+      if (params.index !== val) {
+        params.fragmentChange = true;
+      }
       params.index = val;
     }
   }
@@ -277,8 +283,12 @@ BookReader.prototype.initParams = function() {
     // params explicitly set in URL take precedence over all other methods
     var urlParams = this.paramsFromFragment(this.urlReadFragment());
     if (urlParams.mode) {
-      this.prevReadMode = urlParams.mode;
-    }
+        // If there were any parameters
+        if (Object.keys(urlParams).length > 0) {
+          this.extendParams(params, urlParams);
+          params.fragmentChange = true;
+        }
+      }
     this.extendParams(params, urlParams);
   }
 
@@ -345,8 +355,10 @@ BookReader.prototype.init = function() {
   this.refs.$brContainer = $("<div class='BRcontainer' dir='ltr'></div>");
   this.refs.$br.append(this.refs.$brContainer);
 
-  var initialMode = this.getInitialMode(params);
-  this.mode = initialMode;
+  // Explicitly ensure params.mode exists for updateFromParams() below
+  params.mode = this.getInitialMode(params);
+  // Explicitly ensure this.mode exists for initNavbar()
+  this.mode = params.mode;
 
   if (this.ui == "embed" && this.options.showNavbar) {
     this.initEmbedNavbar();
@@ -360,8 +372,8 @@ BookReader.prototype.init = function() {
   }
 
   this.resizeBRcontainer();
-  this.mode = null; // Needed or else switchMode is a noop
-  this.switchMode(initialMode);
+  this.mode = null; // Needed or else switchMode in updateFromParams() is a noop
+  // this.switchMode(initialMode);
   this.updateFromParams(params);
   this.initUIStrings();
 
@@ -2574,7 +2586,11 @@ exposeOverrideableMethod(BookModel, '_models.book', '_getDataProp');
  */
 BookReader.prototype.updateFromParams = function(params) {
   if ('undefined' != typeof(params.mode)) {
-    this.switchMode(params.mode);
+    var options = {};
+    if ('undefined' != typeof(params.fragmentChange)) {
+        options = { suppressFragmentChange: !params.fragmentChange };
+    }
+    this.switchMode(params.mode, options);
   }
 
   // $$$ process /zoom
